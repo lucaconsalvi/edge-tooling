@@ -59,6 +59,7 @@ scripts/launch.sh tna 4.22.0-rc.0 --initial 4.21.0 --job all
 scripts/launch.sh tnf 4.22.0-rc.0 --job 3
 scripts/launch.sh tnf 4.22.0-rc.0 --job 3,7,12
 scripts/launch.sh tnf 4.22.0-rc.0 --job recovery
+scripts/launch.sh tnf 5.0.0-rc.5 --job lvms
 
 # Preview without launching
 scripts/launch.sh tnf 4.22.0-rc.0 --job all --dry-run
@@ -84,6 +85,7 @@ Version tags are expanded automatically: `4.22.0-rc.0` becomes `quay.io/openshif
 edge-ocp-rc/
 ├── jobs/
 │   ├── tnf.txt              # Regular TNF jobs
+│   ├── tnf-lvms.txt         # Tracked TNF LVMS job
 │   ├── tnf-z-stream.txt     # TNF z-stream upgrade jobs
 │   ├── tnf-y-stream.txt     # TNF y-stream upgrade jobs
 │   ├── tna.txt              # Regular TNA jobs
@@ -141,6 +143,7 @@ Each topology has up to three job files — one per job type:
 | File | Type | Description |
 |------|------|-------------|
 | `<topology>.txt` | Regular | Standard CI jobs — no upgrade path |
+| `tnf-lvms.txt` | LVMS | TNF LVMS MNO periodic; tracked so it can launch before Sippy has run history |
 | `<topology>-z-stream.txt` | z-stream | Within-version upgrades (e.g., 4.22.0-ec.4 → 4.22.0-rc.0) |
 | `<topology>-y-stream.txt` | y-stream | Cross-version upgrades (e.g., 4.21.0 → 4.22.0-rc.0) |
 
@@ -158,6 +161,9 @@ Jobs are sorted into files automatically:
 - Names containing `upgrade-from-stable` go to the y-stream file
 - Names ending with `-upgrade` go to the z-stream file
 - Everything else goes to the regular file
+
+The TNF LVMS job is kept in `tnf-lvms.txt` and remains available after `--refresh`.
+Use `--job lvms` to launch only that lane against a 5.0 payload.
 
 ### Upgrade jobs and --initial
 
@@ -186,7 +192,7 @@ Usage: scripts/status.sh [topology] [--run <name>] [--json] [--failed] [--logs] 
 | `[topology]` | `tnf`, `tna`, or `sno` (omit for all topologies) |
 | `--json` | Structured JSON output (for agentic consumption) |
 | `--failed` | Show only failed/aborted jobs |
-| `--logs` | Fetch failure reasons from Prow artifacts (`junit_operator.xml`) |
+| `--logs` | Fetch failure reasons from Prow artifacts; for TNF LVMS, use the suite JUnit with a Prow JUnit fallback |
 | `--classify` | Classify failures using Sippy nightly pass rates (implies `--logs`) |
 | `--report` | Jira-ready markdown output (implies `--logs`) |
 | `--watch [N]` | Poll every N seconds (default 120) until all jobs complete |
