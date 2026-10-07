@@ -314,7 +314,32 @@ fi
 
 if ! $LIST_ONLY && [[ -n "$RELEASE_IMAGE" ]]; then
     REQUESTED_RELEASE=$(echo "${RELEASE_IMAGE#*:}" | grep -oE '^[0-9]+\.[0-9]+' || true)
-    if [[ "$TOPOLOGY" == "tnf" && "$JOB_FILTER" == "lvms" ]]; then
+    if [[ "$TOPOLOGY" == "tnf" && "$JOB_FILTER" == "lvms" && -z "$REQUESTED_RELEASE" ]]; then
+        echo "Error: cannot determine the payload release for the TNF LVMS lane"
+        exit 1
+    fi
+    if [[ "$JOB_FILTER" =~ ^[0-9,]+$ ]]; then
+        # Numbering must match --list, including the tracked LVMS file.
+        JOB_NUMBER=0
+        for file in "$JOB_FILE" "$JOB_FILE_LVMS" "$JOB_FILE_Z" "$JOB_FILE_Y"; do
+            [[ ! -f "$file" ]] && continue
+            while IFS= read -r job; do
+                [[ -z "$job" ]] && continue
+                JOB_NUMBER=$((JOB_NUMBER + 1))
+                [[ ",$JOB_FILTER," != *",$JOB_NUMBER,"* ]] && continue
+                job_release=$(printf '%s\n' "$job" | sed -nE 's/.*(nightly-|release-)([0-9]+\.[0-9]+).*/\2/p')
+                if [[ "$job" == *"-tnf-lvms-mno-qe-integration-tests" && -z "$REQUESTED_RELEASE" ]]; then
+                    echo "Error: cannot determine the payload release for TNF LVMS job #$JOB_NUMBER"
+                    exit 1
+                fi
+                if [[ -n "$job_release" && -n "$REQUESTED_RELEASE" && "$job_release" != "$REQUESTED_RELEASE" ]]; then
+                    echo "Error: selected job #$JOB_NUMBER targets $job_release, but you requested $REQUESTED_RELEASE"
+                    exit 1
+                fi
+            done < "$file"
+        done
+        JOBS_RELEASE="$REQUESTED_RELEASE"
+    elif [[ "$TOPOLOGY" == "tnf" && "$JOB_FILTER" == "lvms" ]]; then
         JOBS_RELEASE=$(sed -nE 's/.*release-([0-9]+\.[0-9]+)-nightly-.*/\1/p' "$JOB_FILE_LVMS" | head -1)
     else
         JOBS_RELEASE=$(detect_release "")
@@ -470,7 +495,7 @@ job_selected() {
     if [[ -n "$JOB_PATTERN" ]] && [[ "$job" != *"$JOB_PATTERN"* ]]; then
         return 1
     fi
-    if [[ "$job" == *"-tnf-lvms-mno-qe-integration-tests" && -n "$REQUESTED_RELEASE" && "$REQUESTED_RELEASE" != "5.0" ]]; then
+    if [[ "$job" == *"-tnf-lvms-mno-qe-integration-tests" && "$REQUESTED_RELEASE" != "5.0" ]]; then
         return 1
     fi
     return 0

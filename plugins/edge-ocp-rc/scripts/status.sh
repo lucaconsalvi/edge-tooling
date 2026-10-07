@@ -208,7 +208,7 @@ fetch_failure_reason() {
 import sys, xml.etree.ElementTree as ET
 try:
     tree = ET.parse(sys.stdin)
-    cases = [tc for tc in tree.iter() if tc.tag in ('testcase', 'testcases') and tc.get('name')]
+    cases = [tc for tc in tree.iter('testcase') if tc.get('name')]
     for tc in cases:
         fail = tc.find('failure')
         if fail is None:
