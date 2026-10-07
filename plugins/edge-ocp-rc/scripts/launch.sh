@@ -341,6 +341,28 @@ if ! $LIST_ONLY && [[ -n "$RELEASE_IMAGE" ]]; then
         JOBS_RELEASE="$REQUESTED_RELEASE"
     elif [[ "$TOPOLOGY" == "tnf" && "$JOB_FILTER" == "lvms" ]]; then
         JOBS_RELEASE=$(sed -nE 's/.*release-([0-9]+\.[0-9]+)-nightly-.*/\1/p' "$JOB_FILE_LVMS" | head -1)
+    elif [[ -n "$JOB_FILTER" && "$JOB_FILTER" != "all" ]]; then
+        # A text selector may match a job in a different file than the first
+        # Sippy list, so validate the matching jobs rather than that list.
+        for file in "$JOB_FILE" "$JOB_FILE_LVMS" "$JOB_FILE_Z" "$JOB_FILE_Y"; do
+            [[ ! -f "$file" ]] && continue
+            if [[ -z "${INITIAL_IMAGE:-}" && ( "$file" == "$JOB_FILE_Z" || "$file" == "$JOB_FILE_Y" ) ]]; then
+                continue
+            fi
+            while IFS= read -r job; do
+                [[ -z "$job" || "$job" != *"$JOB_FILTER"* ]] && continue
+                job_release=$(printf '%s\n' "$job" | sed -nE 's/.*(nightly-|release-)([0-9]+\.[0-9]+).*/\2/p')
+                if [[ "$job" == *"-tnf-lvms-mno-qe-integration-tests" && -z "$REQUESTED_RELEASE" ]]; then
+                    echo "Error: cannot determine the payload release for the TNF LVMS lane"
+                    exit 1
+                fi
+                if [[ -n "$job_release" && -n "$REQUESTED_RELEASE" && "$job_release" != "$REQUESTED_RELEASE" ]]; then
+                    echo "Error: selected job '$job' targets $job_release, but you requested $REQUESTED_RELEASE"
+                    exit 1
+                fi
+            done < "$file"
+        done
+        JOBS_RELEASE="$REQUESTED_RELEASE"
     else
         JOBS_RELEASE=$(detect_release "")
     fi
