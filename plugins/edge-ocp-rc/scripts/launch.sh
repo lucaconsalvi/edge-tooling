@@ -312,6 +312,7 @@ if ! $LIST_ONLY && ! $REFRESH && ! $RELAUNCH_FAILED && [[ -n "$RELEASE_IMAGE" ]]
     exit 1
 fi
 
+check_job_release() {
 if ! $LIST_ONLY && [[ -n "$RELEASE_IMAGE" ]]; then
     REQUESTED_RELEASE=$(echo "${RELEASE_IMAGE#*:}" | grep -oE '^[0-9]+\.[0-9]+' || true)
     if [[ "$TOPOLOGY" == "tnf" && "$JOB_FILTER" == "lvms" && -z "$REQUESTED_RELEASE" ]]; then
@@ -376,6 +377,7 @@ if ! $LIST_ONLY && [[ -n "$RELEASE_IMAGE" ]]; then
         exit 1
     fi
 fi
+}
 
 # List jobs from a file with continuous numbering
 # Args: file, section_label, counter_var_name (LINE_NUM is global)
@@ -458,6 +460,8 @@ if $RELAUNCH_FAILED; then
     echo "Re-launching failed jobs: $FAILED_NUMS"
     JOB_FILTER="$FAILED_NUMS"
 fi
+
+check_job_release
 
 RUN_DIR="$SCRIPT_DIR/runs/${RUN_NAME}/${TOPOLOGY}"
 mkdir -p "$RUN_DIR"

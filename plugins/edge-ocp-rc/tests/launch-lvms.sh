@@ -54,3 +54,16 @@ run_failure all-mixed-release 'job files are for 4.22' "$image_5_0" --job all
 run_failure pattern-unknown-release 'cannot determine the payload release' "$unknown_image" --job lvms
 run_failure text-unknown-release 'cannot determine the payload release' "$unknown_image" --job mno
 run_failure number-unknown-release 'cannot determine the payload release' "$unknown_image" --job 2
+
+mkdir -p "$test_dir/bin" "$test_dir/runs/relaunch-source/tnf"
+cat > "$test_dir/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"result":"FAILURE"}'
+EOF
+chmod +x "$test_dir/bin/curl"
+export PATH="$test_dir/bin:$PATH"
+printf '[{"JobName":"%s","JobURL":"https://prow.ci.openshift.org/view/gs/example"}]\n' \
+    "$(cat "$test_dir/jobs/tnf-lvms.txt")" > "$test_dir/runs/relaunch-source/tnf/gangway_failed.json"
+
+run_failure relaunch-wrong-release 'selected job #2 targets 5.0' "$image_4_22" --relaunch-failed
+run_success relaunch-5-0 'tnf-lvms-mno-qe-integration-tests' "$image_5_0" --relaunch-failed
