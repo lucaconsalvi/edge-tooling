@@ -138,7 +138,7 @@ Before launching, the script verifies:
 
 ### Job files and Sippy refresh
 
-Each topology has up to three job files — one per job type:
+Each topology has up to four job files — one per job type:
 
 | File | Type | Description |
 |------|------|-------------|
@@ -149,7 +149,7 @@ Each topology has up to three job files — one per job type:
 
 Each file is a plain list of Prow job names, one per line. No prefixes.
 
-Use `--refresh` to update all three from Sippy:
+Use `--refresh` to update the regular and upgrade job files from Sippy:
 
 ```bash
 scripts/launch.sh tnf --refresh        # Fetches nightly jobs matching "two-node-fencing"
@@ -164,12 +164,17 @@ Jobs are sorted into files automatically:
 
 The TNF LVMS job is kept in `tnf-lvms.txt` and remains available after `--refresh`.
 Use `--job lvms` to launch only that lane against a 5.0 payload.
+The lane installs LVMS from the 5.0 Konflux catalog through OLM. The payload
+argument selects OpenShift; the operator comes from the current `v5.0` catalog.
+Prow artifacts record the installed CSV and catalog/operator image IDs. To test
+a specific catalog image or digest, use Gangway's
+`MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE` environment override.
 
 ### Upgrade jobs and --initial
 
-Without `--initial`, only regular jobs are launched. Upgrade jobs are skipped with a summary message.
+Without `--initial`, regular and applicable LVMS jobs are launched. Upgrade jobs are skipped with a summary message.
 
-With `--initial`, all three files are processed:
+With `--initial`, all available job files are processed:
 
 ```bash
 # Regular jobs only
