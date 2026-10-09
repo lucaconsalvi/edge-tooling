@@ -85,7 +85,7 @@ Version tags are expanded automatically: `4.22.0-rc.0` becomes `quay.io/openshif
 edge-ocp-rc/
 ├── jobs/
 │   ├── tnf.txt              # Regular TNF jobs
-│   ├── tnf-lvms.txt         # Tracked TNF LVMS job
+│   ├── tnf-lvms.txt         # TNF LVMS job, updated by Sippy refresh
 │   ├── tnf-z-stream.txt     # TNF z-stream upgrade jobs
 │   ├── tnf-y-stream.txt     # TNF y-stream upgrade jobs
 │   ├── tna.txt              # Regular TNA jobs
@@ -143,13 +143,13 @@ Each topology has up to four job files — one per job type:
 | File | Type | Description |
 |------|------|-------------|
 | `<topology>.txt` | Regular | Standard CI jobs — no upgrade path |
-| `tnf-lvms.txt` | LVMS | TNF LVMS MNO periodic; tracked separately from Sippy refresh |
+| `tnf-lvms.txt` | LVMS | TNF LVMS MNO periodic; seeded for 5.0 and updated by Sippy refresh |
 | `<topology>-z-stream.txt` | z-stream | Within-version upgrades (e.g., 4.22.0-ec.4 → 4.22.0-rc.0) |
 | `<topology>-y-stream.txt` | y-stream | Cross-version upgrades (e.g., 4.21.0 → 4.22.0-rc.0) |
 
 Each file is a plain list of Prow job names, one per line. No prefixes.
 
-Use `--refresh` to update the regular and upgrade job files from Sippy:
+Use `--refresh` to update regular, upgrade, and TNF LVMS job files from Sippy:
 
 ```bash
 scripts/launch.sh tnf --refresh        # Fetches nightly jobs matching "two-node-fencing"
@@ -162,14 +162,19 @@ Jobs are sorted into files automatically:
 - Names ending with `-upgrade` go to the z-stream file
 - Everything else goes to the regular file
 
-The TNF LVMS job is kept in `tnf-lvms.txt` because `--refresh` searches for
-`two-node-fencing` and then keeps only `openshift-release-main-nightly` jobs.
-The LVMS periodic belongs to `openshift-lvm-operator` and uses `tnf-lvms` in its
-name, so it would be excluded even after Sippy has run history for it. The
-tracked file remains available after `--refresh`.
-Use `--job lvms` to launch only that lane against a 5.0 payload.
-The lane installs LVMS from the 5.0 Konflux catalog through OLM. The payload
-argument selects OpenShift; the operator comes from the current `v5.0` catalog.
+TNF refresh queries Sippy separately for the `openshift-lvm-operator` LVMS job
+matching the requested minor release. It accepts registered jobs with no run
+history. The committed 5.0 entry stays available until Sippy returns a matching
+job. If no job is found for a newer release, refresh retains the existing entry,
+and `--job lvms` rejects a payload from the wrong minor release. Once a 5.1
+lane exists in `openshift/release` and appears in Sippy, run
+`scripts/launch.sh tnf 5.1.0-rc.0 --refresh` to select it.
+
+Use `--job lvms` to launch only the lane matching the payload's minor release.
+The current 5.0 lane installs LVMS from the 5.0 Konflux catalog through OLM.
+A future release lane needs its own matching catalog in `openshift/release`.
+The payload argument selects OpenShift; the operator comes from the catalog
+configured by that lane.
 Prow artifacts record the installed CSV and catalog/operator image IDs. To test
 a specific catalog image or digest, use Gangway's
 `MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE` environment override.

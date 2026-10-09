@@ -214,7 +214,7 @@ if [[ -n "$RELEASE_IMAGE" ]] && ! $REFRESH; then
     fi
 fi
 
-# Sippy-managed topology lists plus the tracked TNF LVMS job.
+# Sippy-managed topology lists plus a TNF LVMS entry seeded for new lanes.
 JOB_FILE="$SCRIPT_DIR/jobs/${TOPOLOGY}.txt"
 JOB_FILE_LVMS="$SCRIPT_DIR/jobs/${TOPOLOGY}-lvms.txt"
 JOB_FILE_Z="$SCRIPT_DIR/jobs/${TOPOLOGY}-z-stream.txt"
@@ -241,6 +241,26 @@ if $REFRESH; then
     echo "Fetching $TOPOLOGY jobs from Sippy (release $OCP_RELEASE, filter: $SEARCH_TERM)..."
     SIPPY_RESPONSE=$(curl --fail --silent --show-error --connect-timeout 5 --max-time 30 \
          "${SIPPY_API}?release=${OCP_RELEASE}&filter=${ENCODED_FILTER}&period=default&sortField=name&sort=asc")
+
+    if [[ "$TOPOLOGY" == "tnf" ]]; then
+        # The regular TNF query excludes lvm-operator jobs. Refresh the LVMS
+        # entry separately, including registered jobs without run history.
+        LVMS_FILTER_JSON='{"items":[{"columnField":"name","operatorValue":"contains","value":"tnf-lvms-mno-qe-integration-tests"}],"linkOperator":"and"}'
+        LVMS_ENCODED_FILTER=$(printf '%s' "$LVMS_FILTER_JSON" | jq -sRr '@uri')
+        if LVMS_RESPONSE=$(curl --fail --silent --show-error --connect-timeout 5 --max-time 30 \
+             "${SIPPY_API}?release=${OCP_RELEASE}&filter=${LVMS_ENCODED_FILTER}&period=default&sortField=name&sort=asc"); then
+            LVMS_JOBS=$(printf '%s' "$LVMS_RESPONSE" | jq -r --arg release "$OCP_RELEASE" \
+                '.[] | select(.name | startswith("periodic-ci-openshift-lvm-operator-release-" + $release + "-nightly-") and endswith("-tnf-lvms-mno-qe-integration-tests")) | .name' | sort -u)
+            if [[ -n "$LVMS_JOBS" ]]; then
+                printf '%s\n' "$LVMS_JOBS" > "$JOB_FILE_LVMS"
+                echo "Updated TNF LVMS jobs from Sippy for release $OCP_RELEASE"
+            else
+                echo "No TNF LVMS job found in Sippy for release $OCP_RELEASE; keeping the tracked entry"
+            fi
+        else
+            echo "Warning: could not refresh TNF LVMS jobs from Sippy; keeping the tracked entry" >&2
+        fi
+    fi
 
     # Clear existing files before writing
     rm -f "$JOB_FILE" "$JOB_FILE_Z" "$JOB_FILE_Y"
@@ -341,6 +361,10 @@ if ! $LIST_ONLY && [[ -n "$RELEASE_IMAGE" ]]; then
         done
         JOBS_RELEASE="$REQUESTED_RELEASE"
     elif [[ "$TOPOLOGY" == "tnf" && "$JOB_FILTER" == "lvms" ]]; then
+        if [[ ! -f "$JOB_FILE_LVMS" ]]; then
+            echo "Error: no TNF LVMS job is available; run './launch.sh tnf $REQUESTED_RELEASE --refresh'"
+            exit 1
+        fi
         JOBS_RELEASE=$(sed -nE 's/.*release-([0-9]+\.[0-9]+)-nightly-.*/\1/p' "$JOB_FILE_LVMS" | head -1)
     elif [[ -n "$JOB_FILTER" && "$JOB_FILTER" != "all" ]]; then
         # A text selector may match a job in a different file than the first
@@ -521,8 +545,10 @@ job_selected() {
     if [[ -n "$JOB_PATTERN" ]] && [[ "$job" != *"$JOB_PATTERN"* ]]; then
         return 1
     fi
-    if [[ "$job" == *"-tnf-lvms-mno-qe-integration-tests" && "$REQUESTED_RELEASE" != "5.0" ]]; then
-        return 1
+    if [[ "$job" == *"-tnf-lvms-mno-qe-integration-tests" ]]; then
+        local job_release
+        job_release=$(printf '%s\n' "$job" | sed -nE 's/.*release-([0-9]+\.[0-9]+)-nightly-.*/\1/p')
+        [[ -n "$REQUESTED_RELEASE" && "$job_release" == "$REQUESTED_RELEASE" ]] || return 1
     fi
     return 0
 }

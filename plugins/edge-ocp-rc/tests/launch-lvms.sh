@@ -67,3 +67,25 @@ printf '[{"JobName":"%s","JobURL":"https://prow.ci.openshift.org/view/gs/example
 
 run_failure relaunch-wrong-release 'selected job #2 targets 5.0' "$image_4_22" --relaunch-failed
 run_success relaunch-5-0 'tnf-lvms-mno-qe-integration-tests' "$image_5_0" --relaunch-failed
+
+# A future release should be discovered from Sippy without changing launch.sh.
+cat > "$test_dir/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+    *release=5.2*) printf '%s\n' '[]' ;;
+    *tnf-lvms-mno-qe-integration-tests*)
+        printf '%s\n' '[{"name":"periodic-ci-openshift-lvm-operator-release-5.1-nightly-e2e-baremetalds-tnf-lvms-mno-qe-integration-tests","current_runs":0},{"name":"periodic-ci-openshift-lvm-operator-release-5.0-nightly-e2e-baremetalds-tnf-lvms-mno-qe-integration-tests","current_runs":1}]'
+        ;;
+    *) printf '%s\n' '[{"name":"periodic-ci-openshift-release-main-nightly-5.1-e2e-baremetalds-two-node-fencing","current_runs":1}]' ;;
+esac
+EOF
+chmod +x "$test_dir/bin/curl"
+
+image_5_1='registry.example.test/ocp:5.1.0-rc.0-x86_64'
+image_5_2='registry.example.test/ocp:5.2.0-rc.0-x86_64'
+run_success refresh-5-1 'Updated TNF LVMS jobs from Sippy for release 5.1' "$image_5_1" --refresh
+run_success pattern-5-1 'tnf-lvms-mno-qe-integration-tests' "$image_5_1" --job lvms
+run_success all-5-1 '2 jobs launched' "$image_5_1" --job all
+run_failure stale-5-0 'targets 5.1, but you requested 5.0' "$image_5_0" --job lvms
+run_success refresh-no-5-2 'keeping the tracked entry' "$image_5_2" --refresh
+run_failure missing-5-2 'targets 5.1, but you requested 5.2' "$image_5_2" --job lvms
