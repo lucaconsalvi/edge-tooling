@@ -143,7 +143,7 @@ Each topology has up to four job files — one per job type:
 | File | Type | Description |
 |------|------|-------------|
 | `<topology>.txt` | Regular | Standard CI jobs — no upgrade path |
-| `tnf-lvms.txt` | LVMS | TNF LVMS MNO periodic; tracked so it can launch before Sippy has run history |
+| `tnf-lvms.txt` | LVMS | TNF LVMS MNO periodic; tracked separately from Sippy refresh |
 | `<topology>-z-stream.txt` | z-stream | Within-version upgrades (e.g., 4.22.0-ec.4 → 4.22.0-rc.0) |
 | `<topology>-y-stream.txt` | y-stream | Cross-version upgrades (e.g., 4.21.0 → 4.22.0-rc.0) |
 
@@ -162,7 +162,11 @@ Jobs are sorted into files automatically:
 - Names ending with `-upgrade` go to the z-stream file
 - Everything else goes to the regular file
 
-The TNF LVMS job is kept in `tnf-lvms.txt` and remains available after `--refresh`.
+The TNF LVMS job is kept in `tnf-lvms.txt` because `--refresh` searches for
+`two-node-fencing` and then keeps only `openshift-release-main-nightly` jobs.
+The LVMS periodic belongs to `openshift-lvm-operator` and uses `tnf-lvms` in its
+name, so it would be excluded even after Sippy has run history for it. The
+tracked file remains available after `--refresh`.
 Use `--job lvms` to launch only that lane against a 5.0 payload.
 The lane installs LVMS from the 5.0 Konflux catalog through OLM. The payload
 argument selects OpenShift; the operator comes from the current `v5.0` catalog.
